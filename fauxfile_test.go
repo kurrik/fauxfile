@@ -24,11 +24,32 @@ func ExpectCwd(t *testing.T, expected string, mf *MockFilesystem) {
 	}
 }
 
+func ExpectDir(t *testing.T, path string, mf *MockFilesystem) {
+	mode, exists := mf.dirs[path]
+	if !exists {
+		t.Fatalf("Expected path of '%s' to be present", path)
+	}
+	if !mode.IsDir() {
+		t.Fatalf("Expected '%v' to be directory", path)
+	}
+}
+
 func TestChdir(t *testing.T) {
 	mf := NewMockFilesystem()
 	mf.Mkdir("/foo", 0755)
 	ExpectCwd(t, "/", mf)
 	mf.Chdir("foo")
 	ExpectCwd(t, "/foo", mf)
+}
+
+func TestMkdir(t *testing.T) {
+	mf := NewMockFilesystem()
+	mf.Mkdir("/foo", 0755)
+	mf.Mkdir("/bar", 0777)
+	mf.Chdir("bar")
+	mf.Mkdir("baz", 0777)
+	ExpectDir(t, "/foo", mf)
+	ExpectDir(t, "/bar", mf)
+	ExpectDir(t, "/bar/baz", mf)
 }
 
