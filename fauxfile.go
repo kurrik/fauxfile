@@ -50,10 +50,6 @@ func (f *Filesystem) Create(name string) (file *os.File, err error) {
 	return os.Create(name)
 }
 
-func (f *Filesystem) NewFile(fd uintptr, name string) *os.File {
-	return os.NewFile(fd, name)
-}
-
 func (f *Filesystem) Open(name string) (file *os.File, err error) {
 	return os.Open(name)
 }
@@ -147,10 +143,6 @@ func (mf *MockFilesystem) Create(name string) (file *os.File, err error) {
 	return os.Create(name)
 }
 
-func (mf *MockFilesystem) NewFile(fd uintptr, name string) *os.File {
-	return os.NewFile(fd, name)
-}
-
 func (mf *MockFilesystem) Open(name string) (file *os.File, err error) {
 	return os.Open(name)
 }
@@ -159,4 +151,40 @@ func (mf *MockFilesystem) OpenFile(name string, flag int, perm os.FileMode) (fil
 	return os.OpenFile(name, flag, perm)
 }
 
+type MockFile struct {
+	name string
+	filesystem *MockFilesystem
+	mode FileMode
+	modified time.Time
+	data []bytes
+}
 
+
+
+type MockFileInfo struct {
+	file *MockFile
+}
+
+func (mfi *MockFileInfo) Name() string {
+	return mfi.file.name
+}
+
+func (mfi *MockFileInfo) Size() int64 {
+	return len(mfi.file.data)
+}
+
+func (mfi *MockFileInfo) Mode() FileMode {
+	return mfi.file.mode
+}
+
+func (mfi *MockFileInfo) ModTime() time.Time {
+	return mfi.file.modified
+}
+
+func (mfi *MockFileInfo) IsDir() bool {
+	return mfi.file.mode.IsDir()
+}
+
+func (mfi *MockFileInfo) Sys() interface{} {
+	return nil
+}
