@@ -16,6 +16,7 @@ package fauxfile
 
 import (
 	"os"
+	"time"
 	"strings"
 	"path/filepath"
 )
@@ -116,9 +117,9 @@ func (mf *MockFilesystem) OpenFile(name string, flag int, perm os.FileMode) (fil
 type MockFile struct {
 	name string
 	filesystem *MockFilesystem
-	mode FileMode
+	mode os.FileMode
 	modified time.Time
-	data []bytes
+	data []byte
 }
 
 
@@ -132,10 +133,10 @@ func (mfi *MockFileInfo) Name() string {
 }
 
 func (mfi *MockFileInfo) Size() int64 {
-	return len(mfi.file.data)
+	return int64(len(mfi.file.data))
 }
 
-func (mfi *MockFileInfo) Mode() FileMode {
+func (mfi *MockFileInfo) Mode() os.FileMode {
 	return mfi.file.mode
 }
 
