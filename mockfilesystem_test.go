@@ -19,19 +19,27 @@ import (
 )
 
 func ExpectCwd(t *testing.T, expected string, mf *MockFilesystem) {
-	if mf.cwd != expected {
+	if mf.cwd.file.path != expected {
 		t.Fatalf("Expected cwd of '%v', got '%v'", expected, mf.cwd)
 	}
 }
 
 func ExpectDir(t *testing.T, path string, mf *MockFilesystem) {
-	mode, exists := mf.dirs[path]
-	if !exists {
+	fi, err := mf.resolve(path)
+	if err != nil {
 		t.Fatalf("Expected path of '%s' to be present", path)
 	}
-	if !mode.IsDir() {
+	if !fi.IsDir() {
 		t.Fatalf("Expected '%v' to be directory", path)
 	}
+}
+
+func ExpectFile(t *testing.T, path string, mf *MockFilesystem) *MockFileInfo {
+	fi, err := mf.resolve(path)
+	if err != nil {
+		t.Fatalf("Expected file at '%s' to be present", path)
+	}
+	return fi
 }
 
 func TestChdir(t *testing.T) {
@@ -53,11 +61,22 @@ func TestMkdir(t *testing.T) {
 	ExpectDir(t, "/bar/baz", mf)
 }
 
-func testMkdirAll(t *testing.T) {
+func TestMkdirAll(t *testing.T) {
 	mf := NewMockFilesystem()
-	mf.MkdirAll("/foo/bar/baz", 0755)
+	err := mf.MkdirAll("/foo/bar/baz", 0755)
+	if err != nil {
+		t.Fatalf("Problem creating directories: %v", err)
+	}
 	ExpectDir(t, "/foo", mf)
 	ExpectDir(t, "/foo/bar", mf)
 	ExpectDir(t, "/foo/bar/baz", mf)
 }
 
+func TestCreate(t *testing.T) {
+	mf := NewMockFilesystem()
+	mf.Create("foo.txt")
+	fi := ExpectFile(t, "/foo.txt", mf)
+	if fi.Mode().Perm() != 0666 {
+		t.Fatalf("New file perm %v, expected 0666", fi.Mode().Perm())
+	}
+}
