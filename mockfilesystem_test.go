@@ -15,6 +15,8 @@
 package fauxfile
 
 import (
+	"fmt"
+	"sort"
 	"testing"
 )
 
@@ -40,6 +42,12 @@ func ExpectFile(t *testing.T, path string, mf *MockFilesystem) *MockFileInfo {
 		t.Fatalf("Expected file at '%s' to be present", path)
 	}
 	return fi
+}
+
+func ExpectEqual(t *testing.T, expected string, actual string) {
+	if expected != actual {
+		t.Fatalf("Expected '%v', got '%v'", expected, actual)
+	}
 }
 
 func TestChdir(t *testing.T) {
@@ -80,3 +88,124 @@ func TestCreate(t *testing.T) {
 		t.Fatalf("New file perm %v, expected 0666", fi.Mode().Perm())
 	}
 }
+
+func TestCreateSubdirectoryPath(t *testing.T) {
+	mf := NewMockFilesystem()
+	mf.Mkdir("foo", 0755)
+	mf.Chdir("foo")
+	_, err := mf.Create("foo.txt")
+	if err != nil {
+		t.Fatalf("Create should not throw error")
+	}
+	fi := ExpectFile(t, "/foo/foo.txt", mf)
+	ExpectEqual(t, "/foo/foo.txt", fi.file.path)
+	ExpectEqual(t, "foo.txt", fi.file.name)
+}
+
+func TestLongFormCreate(t *testing.T) {
+	mf := NewMockFilesystem()
+	mf.Mkdir("foo", 0755)
+	_, err := mf.Create("foo/foo.txt")
+	if err != nil {
+		t.Fatalf("Create should not throw error")
+	}
+	fi := ExpectFile(t, "/foo/foo.txt", mf)
+	ExpectEqual(t, "/foo/foo.txt", fi.file.path)
+	ExpectEqual(t, "foo.txt", fi.file.name)
+}
+
+func TestOpen(t *testing.T) {
+	mf := NewMockFilesystem()
+	mf.Create("foo.txt")
+	f, err := mf.Open("foo.txt")
+	if err != nil {
+		t.Fatalf("Error: %v", err)
+	}
+	ExpectEqual(t, "foo.txt", f.name)
+	ExpectEqual(t, "/foo.txt", f.path)
+}
+
+func TestRemove(t *testing.T) {
+	mf := NewMockFilesystem()
+	mf.Mkdir("foo", 0755)
+	mf.Create("foo/foo.txt")
+	err := mf.Remove("foo")
+	if err == nil {
+		t.Fatalf("Should not be able to remove non-empty directories")
+	}
+	err = mf.Remove("foo/foo.txt")
+	if err != nil {
+		t.Fatalf("Should be able to remove file")
+	}
+	_, err = mf.Open("foo/foo.txt")
+	if err == nil {
+		t.Fatalf("Remove did not remove file")
+	}
+	err = mf.Remove("foo")
+	if err != nil {
+		t.Fatalf("Should be able to remove empty directory")
+	}
+	_, err = mf.Open("foo")
+	if err == nil {
+		t.Fatalf("Remove did not remove directory")
+	}
+}
+
+func TestRemoveAll(t *testing.T) {
+	mf := NewMockFilesystem()
+	mf.Mkdir("foo", 0755)
+	mf.Create("foo/foo.txt")
+	mf.Create("foo/bar.txt")
+	mf.RemoveAll("foo")
+	_, err := mf.Open("/foo/foo.txt")
+	if err == nil {
+		t.Fatalf("RemoveAll should remove children")
+	}
+	_, err = mf.Open("/foo/bar.txt")
+	if err == nil {
+		t.Fatalf("RemoveAll should remove children")
+	}
+	_, err = mf.Open("/foo")
+	if err == nil {
+		t.Fatalf("RemoveAll should remove target")
+	}
+}
+
+func TestReaddir(t *testing.T) {
+	mf := NewMockFilesystem()
+	mf.Mkdir("foo", 0755)
+	mf.Mkdir("foo/a", 0755)
+	mf.Create("foo/b.txt")
+	mf.Create("foo/c.txt")
+	f, _ := mf.Open("foo")
+	fi, err := f.Readdir(-1)
+	if err != nil {
+		t.Fatalf("Readdir should not throw error.")
+	}
+	files := map[string]string{}
+	for _, i := range fi {
+		files[i.file.name] = i.file.path
+	}
+	ExpectEqual(t, "/foo/a", files["a"])
+	ExpectEqual(t, "/foo/b.txt", files["b.txt"])
+	ExpectEqual(t, "/foo/c.txt", files["c.txt"])
+	ExpectEqual(t, "3", fmt.Sprintf("%v", len(files)))
+}
+
+func TestReaddirnames(t *testing.T) {
+	mf := NewMockFilesystem()
+	mf.Mkdir("foo", 0755)
+	mf.Mkdir("foo/a", 0755)
+	mf.Create("foo/b.txt")
+	mf.Create("foo/c.txt")
+	f, _ := mf.Open("foo")
+	names, err := f.Readdirnames(-1)
+	if err != nil {
+		t.Fatalf("Readdir should not throw error.")
+	}
+	sort.Strings(names)
+	ExpectEqual(t, "a", names[0])
+	ExpectEqual(t, "b.txt", names[1])
+	ExpectEqual(t, "c.txt", names[2])
+}
+
