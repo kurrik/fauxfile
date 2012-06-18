@@ -15,6 +15,11 @@ import (
 	"os"
 )
 
+type File interface {
+	Readdir(n int) (fi []os.FileInfo, err error)
+	Readdirnames(n int) (names []string, err error)
+}
+
 type Filesystem struct {}
 
 func (f *Filesystem) Chdir(dir string) error {
@@ -41,14 +46,14 @@ func (f *Filesystem) Rename(oldname string, newname string) error {
 	return os.Rename(oldname, newname)
 }
 
-func (f *Filesystem) Create(name string) (file *os.File, err error) {
+func (f *Filesystem) Create(name string) (file File, err error) {
 	return os.Create(name)
 }
 
-func (f *Filesystem) Open(name string) (file *os.File, err error) {
+func (f *Filesystem) Open(name string) (file File, err error) {
 	return os.Open(name)
 }
 
-func (f *Filesystem) OpenFile(name string, flag int, perm os.FileMode) (file *os.File, err error) {
+func (f *Filesystem) OpenFile(name string, flag int, perm os.FileMode) (file File, err error) {
 	return os.OpenFile(name, flag, perm)
 }

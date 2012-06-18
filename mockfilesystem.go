@@ -167,7 +167,7 @@ func (mf *MockFilesystem) Rename(oldname string, newname string) error {
 	return errors.New("Not implemented")
 }
 
-func (mf *MockFilesystem) Create(name string) (file *MockFile, err error) {
+func (mf *MockFilesystem) Create(name string) (file File, err error) {
 	path := mf.getpath(name)
 	dir, filename := filepath.Split(path)
 	fi, err := mf.resolve(dir)
@@ -190,7 +190,7 @@ func (mf *MockFilesystem) Create(name string) (file *MockFile, err error) {
 	return fi.Child(filename).file, nil
 }
 
-func (mf *MockFilesystem) Open(name string) (file *MockFile, err error) {
+func (mf *MockFilesystem) Open(name string) (file File, err error) {
 	fi, err := mf.resolve(name)
 	if err != nil {
 		return nil, err
@@ -198,7 +198,7 @@ func (mf *MockFilesystem) Open(name string) (file *MockFile, err error) {
 	return fi.file, nil
 }
 
-func (mf *MockFilesystem) OpenFile(name string, flag int, perm os.FileMode) (file *os.File, err error) {
+func (mf *MockFilesystem) OpenFile(name string, flag int, perm os.FileMode) (file File, err error) {
 	return nil, errors.New("Not implemented")
 }
 
@@ -213,9 +213,9 @@ type MockFile struct {
 	children   map[string]*MockFileInfo
 }
 
-func (mf *MockFile) Readdir(n int) (fi []MockFileInfo, err error) {
+func (mf *MockFile) Readdir(n int) (fi []os.FileInfo, err error) {
 	// TODO: Enable returning additional elements in subsequent calls.
-	fi = make([]MockFileInfo, 0)
+	fi = make([]os.FileInfo, 0)
 	limit := len(mf.children)
 	if n > 0 {
 		limit = n
@@ -231,7 +231,7 @@ func (mf *MockFile) Readdir(n int) (fi []MockFileInfo, err error) {
 		if i == limit {
 			break
 		}
-		fi = append(fi, *child)
+		fi = append(fi, child)
 		i++
 	}
 	return

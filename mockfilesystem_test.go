@@ -121,8 +121,8 @@ func TestOpen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error: %v", err)
 	}
-	ExpectEqual(t, "foo.txt", f.name)
-	ExpectEqual(t, "/foo.txt", f.path)
+	ExpectEqual(t, "foo.txt", f.(*MockFile).name)
+	ExpectEqual(t, "/foo.txt", f.(*MockFile).path)
 }
 
 func TestRemove(t *testing.T) {
@@ -184,7 +184,7 @@ func TestReaddir(t *testing.T) {
 	}
 	files := map[string]string{}
 	for _, i := range fi {
-		files[i.file.name] = i.file.path
+		files[i.Name()] = i.(*MockFileInfo).file.path
 	}
 	ExpectEqual(t, "/foo/a", files["a"])
 	ExpectEqual(t, "/foo/b.txt", files["b.txt"])
