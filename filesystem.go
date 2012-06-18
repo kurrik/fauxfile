@@ -20,40 +20,52 @@ type File interface {
 	Readdirnames(n int) (names []string, err error)
 }
 
-type Filesystem struct {}
+type Filesystem interface {
+	Chdir(dir string) error
+	Mkdir(name string, perm os.FileMode) error
+	MkdirAll(path string, perm os.FileMode) error
+	Remove(name string) error
+	RemoveAll(path string) error
+	Rename(oldname string, newname string) error
+	Create(name string) (file File, err error)
+	Open(name string) (file File, err error)
+	OpenFile(name string, flag int, perm os.FileMode) (file File, err error)
+}
 
-func (f *Filesystem) Chdir(dir string) error {
+type RealFilesystem struct {}
+
+func (f *RealFilesystem) Chdir(dir string) error {
 	return os.Chdir(dir)
 }
 
-func (f *Filesystem) Mkdir(name string, perm os.FileMode) error {
+func (f *RealFilesystem) Mkdir(name string, perm os.FileMode) error {
 	return os.Mkdir(name, perm)
 }
 
-func (f *Filesystem) MkdirAll(path string, perm os.FileMode) error {
+func (f *RealFilesystem) MkdirAll(path string, perm os.FileMode) error {
 	return os.MkdirAll(path, perm)
 }
 
-func (f *Filesystem) Remove(name string) error {
+func (f *RealFilesystem) Remove(name string) error {
 	return os.Remove(name)
 }
 
-func (f *Filesystem) RemoveAll(path string) error {
+func (f *RealFilesystem) RemoveAll(path string) error {
 	return os.RemoveAll(path)
 }
 
-func (f *Filesystem) Rename(oldname string, newname string) error {
+func (f *RealFilesystem) Rename(oldname string, newname string) error {
 	return os.Rename(oldname, newname)
 }
 
-func (f *Filesystem) Create(name string) (file File, err error) {
+func (f *RealFilesystem) Create(name string) (file File, err error) {
 	return os.Create(name)
 }
 
-func (f *Filesystem) Open(name string) (file File, err error) {
+func (f *RealFilesystem) Open(name string) (file File, err error) {
 	return os.Open(name)
 }
 
-func (f *Filesystem) OpenFile(name string, flag int, perm os.FileMode) (file File, err error) {
+func (f *RealFilesystem) OpenFile(name string, flag int, perm os.FileMode) (file File, err error) {
 	return os.OpenFile(name, flag, perm)
 }
