@@ -208,4 +208,3 @@ func TestReaddirnames(t *testing.T) {
 	ExpectEqual(t, "b.txt", names[1])
 	ExpectEqual(t, "c.txt", names[2])
 }
-
