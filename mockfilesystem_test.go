@@ -208,3 +208,13 @@ func TestReaddirnames(t *testing.T) {
 	ExpectEqual(t, "b.txt", names[1])
 	ExpectEqual(t, "c.txt", names[2])
 }
+
+func TestFileChdir(t *testing.T) {
+	mf := NewMockFilesystem()
+	mf.MkdirAll("/foo/bar/baz", 0755)
+	mf.Create("/foo/bar/baz/foo.txt")
+	f, _ := mf.Open("/foo/bar/baz/foo.txt")
+	ExpectCwd(t, "/", mf)
+	f.Chdir()
+	ExpectCwd(t, "/foo/bar/baz", mf)
+}

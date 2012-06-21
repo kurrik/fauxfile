@@ -215,7 +215,7 @@ type MockFile struct {
 
 
 func (mf *MockFile) Chdir() error {
-	return errors.New("Not implemented")
+	return mf.filesystem.Chdir(filepath.Dir(mf.path))
 }
 
 func (mf *MockFile) Chmod(mode os.FileMode) error {
