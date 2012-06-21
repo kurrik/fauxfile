@@ -16,8 +16,21 @@ import (
 )
 
 type File interface {
+	Chdir() error
+	Chmod(mode os.FileMode) error
+	Close() error
+	Name() string
+	Read(b []byte) (n int, err error)
+	ReadAt(b []byte, off int64) (n int, err error)
 	Readdir(n int) (fi []os.FileInfo, err error)
 	Readdirnames(n int) (names []string, err error)
+	Stat() (fi os.FileInfo, err error)
+	Sync() (err error)
+	Seek(offset int64, whence int) (ret int64, err error)
+	Truncate(size int64) error
+	Write(b []byte) (n int, err error)
+	WriteAt(b []byte, off int64) (n int, err error)
+	WriteString(s string) (ret int, err error)
 }
 
 type Filesystem interface {

@@ -213,6 +213,31 @@ type MockFile struct {
 	children   map[string]*MockFileInfo
 }
 
+
+func (mf *MockFile) Chdir() error {
+	return errors.New("Not implemented")
+}
+
+func (mf *MockFile) Chmod(mode os.FileMode) error {
+	return errors.New("Not implemented")
+}
+
+func (mf *MockFile) Close() error {
+	return errors.New("Not implemented")
+}
+
+func (mf *MockFile) Name() string {
+	return mf.name
+}
+
+func (mf *MockFile) Read(b []byte) (n int, err error) {
+	return 0, errors.New("Not implemented")
+}
+
+func (mf *MockFile) ReadAt(b []byte, off int64) (n int, err error) {
+	return 0, errors.New("Not implemented")
+}
+
 func (mf *MockFile) Readdir(n int) (fi []os.FileInfo, err error) {
 	// TODO: Enable returning additional elements in subsequent calls.
 	fi = make([]os.FileInfo, 0)
@@ -244,6 +269,34 @@ func (mf *MockFile) Readdirnames(n int) (names []string, err error) {
 		names[i] = f.Name()
 	}
 	return names, err
+}
+
+func (mf *MockFile) Seek(offset int64, whence int) (ret int64, err error) {
+	return 0, errors.New("Not implemented")
+}
+
+func (mf *MockFile) Stat() (fi os.FileInfo, err error) {
+	return nil, errors.New("Not implemented")
+}
+
+func (mf *MockFile) Sync() (err error) {
+	return errors.New("Not implemented")
+}
+
+func (mf *MockFile) Truncate(size int64) error {
+	return errors.New("Not implemented")
+}
+
+func (mf *MockFile) Write(b []byte) (n int, err error) {
+	return 0, errors.New("Not implemented")
+}
+
+func (mf *MockFile) WriteAt(b []byte, off int64) (n int, err error) {
+	return 0, errors.New("Not implemented")
+}
+
+func (mf *MockFile) WriteString(s string) (ret int, err error) {
+	return 0, errors.New("Not implemented")
 }
 
 type MockFileInfo struct {
