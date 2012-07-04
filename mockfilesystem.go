@@ -118,6 +118,7 @@ func (mf *MockFilesystem) Mkdir(name string, perm os.FileMode) error {
 			data:       nil,
 			parent:     fi,
 			children:   map[string]*MockFileInfo{},
+			closed:     true,
 		},
 	}
 	fi.file.modified = time.Now()
@@ -184,6 +185,7 @@ func (mf *MockFilesystem) Create(name string) (file File, err error) {
 			data:       nil,
 			parent:     fi,
 			children:   nil,
+			closed:     false,
 		},
 	}
 	fi.file.modified = time.Now()
@@ -195,6 +197,7 @@ func (mf *MockFilesystem) Open(name string) (file File, err error) {
 	if err != nil {
 		return nil, err
 	}
+	fi.file.closed = false
 	return fi.file, nil
 }
 
@@ -211,8 +214,8 @@ type MockFile struct {
 	data       *[]byte
 	parent     *MockFileInfo
 	children   map[string]*MockFileInfo
+	closed     bool
 }
-
 
 func (mf *MockFile) Chdir() error {
 	return mf.filesystem.Chdir(filepath.Dir(mf.path))
@@ -224,7 +227,8 @@ func (mf *MockFile) Chmod(mode os.FileMode) error {
 }
 
 func (mf *MockFile) Close() error {
-	return errors.New("Not implemented")
+	mf.closed = true
+	return nil
 }
 
 func (mf *MockFile) Name() string {
