@@ -16,9 +16,9 @@ package fauxfile
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"testing"
-	"os"
 )
 
 func ExpectCwd(t *testing.T, expected string, mf *MockFilesystem) {
@@ -222,8 +222,8 @@ func TestFileChdir(t *testing.T) {
 
 func TestFileChmod(t *testing.T) {
 	var (
-		f File
-		fi os.FileInfo
+		f   File
+		fi  os.FileInfo
 		err error
 	)
 	mf := NewMockFilesystem()
@@ -245,9 +245,9 @@ func TestFileChmod(t *testing.T) {
 
 func TestStat(t *testing.T) {
 	var (
-		mf *MockFilesystem
-		f File
-		fi os.FileInfo
+		mf  *MockFilesystem
+		f   File
+		fi  os.FileInfo
 		err error
 	)
 	mf = NewMockFilesystem()
