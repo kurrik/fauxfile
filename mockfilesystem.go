@@ -296,7 +296,7 @@ func (mf *MockFile) Stat() (fi os.FileInfo, err error) {
 }
 
 func (mf *MockFile) Sync() (err error) {
-	return errors.New("Not implemented")
+	return nil
 }
 
 func (mf *MockFile) Truncate(size int64) error {
