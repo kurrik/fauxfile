@@ -21,6 +21,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"bytes"
 	"time"
 )
 
@@ -111,7 +112,7 @@ func (mf *MockFilesystem) Mkdir(name string, perm os.FileMode) error {
 		filesystem: mf,
 		mode:       perm | os.ModeDir,
 		modified:   time.Now(),
-		data:       nil,
+		data:       new(bytes.Buffer),
 		parent:     fi,
 		children:   map[string]*MockFileInfo{},
 	}
@@ -174,7 +175,7 @@ func (mf *MockFilesystem) Create(name string) (file File, err error) {
 		filesystem: mf,
 		mode:       0666,
 		modified:   time.Now(),
-		data:       nil,
+		data:       new(bytes.Buffer),
 		parent:     fi,
 		children:   nil,
 	}
@@ -241,7 +242,11 @@ func (mf *MockFile) Name() string {
 }
 
 func (mf *MockFile) Read(b []byte) (n int, err error) {
-	return 0, errors.New("Not implemented")
+	var mfi *MockFileInfo
+	if mfi, err = mf.stat(); err != nil {
+		return 0, err
+	}
+	return mfi.data.Read(b)
 }
 
 func (mf *MockFile) ReadAt(b []byte, off int64) (n int, err error) {
@@ -300,11 +305,19 @@ func (mf *MockFile) Sync() (err error) {
 }
 
 func (mf *MockFile) Truncate(size int64) error {
-	return errors.New("Not implemented")
+	var mfi *MockFileInfo
+	if mfi, err = mf.stat(); err != nil {
+		return 0, err
+	}
+	return mfi.data.Truncate(size)
 }
 
 func (mf *MockFile) Write(b []byte) (n int, err error) {
-	return 0, errors.New("Not implemented")
+	var mfi *MockFileInfo
+	if mfi, err = mf.stat(); err != nil {
+		return 0, err
+	}
+	return mfi.data.Write(b)
 }
 
 func (mf *MockFile) WriteAt(b []byte, off int64) (n int, err error) {
@@ -312,11 +325,15 @@ func (mf *MockFile) WriteAt(b []byte, off int64) (n int, err error) {
 }
 
 func (mf *MockFile) WriteString(s string) (ret int, err error) {
-	return 0, errors.New("Not implemented")
+	var mfi *MockFileInfo
+	if mfi, err = mf.stat(); err != nil {
+		return 0, err
+	}
+	return mfi.data.Write(s)
 }
 
 type MockFileInfo struct {
-	data       *[]byte
+	data       *bytes.Buffer
 	name       string
 	filesystem *MockFilesystem
 	mode       os.FileMode
@@ -325,7 +342,6 @@ type MockFileInfo struct {
 	children   map[string]*MockFileInfo
 }
 
-// Not needed for interface.
 func (mfi *MockFileInfo) path() string {
 	ptr := mfi
 	filepath := mfi.name
@@ -353,7 +369,7 @@ func (mfi *MockFileInfo) Name() string {
 }
 
 func (mfi *MockFileInfo) Size() int64 {
-	return int64(len(*mfi.data))
+	return int64(mfi.data.Len())
 }
 
 func (mfi *MockFileInfo) Mode() os.FileMode {
