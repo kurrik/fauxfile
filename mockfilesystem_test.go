@@ -243,6 +243,27 @@ func TestFileChmod(t *testing.T) {
 	}
 }
 
+func TestStat(t *testing.T) {
+	var (
+		mf *MockFilesystem
+		f File
+		fi os.FileInfo
+		err error
+	)
+	mf = NewMockFilesystem()
+	mf.Mkdir("foo", 0755)
+	mf.Create("/foo/foo.txt")
+	if f, err = mf.Open("/foo/foo.txt"); err != nil {
+		t.Fatalf("File should exist: %v", err)
+	}
+	if fi, err = f.Stat(); err != nil {
+		t.Fatalf("Stat should not throw error: %v", err)
+	}
+	if fi.Name() != "foo.txt" {
+		t.Fatalf("Stat should return accurate file object.")
+	}
+}
+
 func TestFileInfoPath(t *testing.T) {
 	mf := NewMockFilesystem()
 	mf.MkdirAll("/foo/bar/baz", 0755)

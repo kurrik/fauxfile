@@ -292,7 +292,7 @@ func (mf *MockFile) Seek(offset int64, whence int) (ret int64, err error) {
 }
 
 func (mf *MockFile) Stat() (fi os.FileInfo, err error) {
-	return nil, errors.New("Not implemented")
+	return mf.stat()
 }
 
 func (mf *MockFile) Sync() (err error) {
