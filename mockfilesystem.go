@@ -219,7 +219,8 @@ func (mf *MockFile) Chdir() error {
 }
 
 func (mf *MockFile) Chmod(mode os.FileMode) error {
-	return errors.New("Not implemented")
+	mf.mode = mode
+	return nil
 }
 
 func (mf *MockFile) Close() error {

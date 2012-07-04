@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"sort"
 	"testing"
+	"os"
 )
 
 func ExpectCwd(t *testing.T, expected string, mf *MockFilesystem) {
@@ -217,4 +218,27 @@ func TestFileChdir(t *testing.T) {
 	ExpectCwd(t, "/", mf)
 	f.Chdir()
 	ExpectCwd(t, "/foo/bar/baz", mf)
+}
+
+func TestFileChmod(t *testing.T) {
+	var (
+		f File
+		fi os.FileInfo
+		err error
+	)
+	mf := NewMockFilesystem()
+	mf.Create("foo.txt")
+	if f, err = mf.Open("foo.txt"); err != nil {
+		t.Fatalf("File expected: %v", err)
+	}
+	fi = ExpectFile(t, "foo.txt", mf)
+	if perm := fi.Mode().Perm(); perm != 0666 {
+		t.Fatalf("New file perm %v, expected 0666", perm)
+	}
+	if err = f.Chmod(0755); err != nil {
+		t.Fatalf("Chmod should not return error: %v", err)
+	}
+	if perm := fi.Mode().Perm(); perm != 0755 {
+		t.Fatalf("Perm %v, expected 0755", perm)
+	}
 }
