@@ -15,13 +15,13 @@
 package fauxfile
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
-	"bytes"
 	"time"
 )
 
@@ -182,8 +182,8 @@ func (mf *MockFilesystem) Create(name string) (file File, err error) {
 	fi.modified = time.Now()
 	f := &MockFile{
 		filesystem: mf,
-		closed: false,
-		path: path,
+		closed:     false,
+		path:       path,
 	}
 	return f, nil
 }
@@ -195,8 +195,8 @@ func (mf *MockFilesystem) Open(name string) (file File, err error) {
 	}
 	f := &MockFile{
 		filesystem: mf,
-		closed: false,
-		path: name,
+		closed:     false,
+		path:       name,
 	}
 	return f, nil
 }
@@ -305,11 +305,15 @@ func (mf *MockFile) Sync() (err error) {
 }
 
 func (mf *MockFile) Truncate(size int64) error {
-	var mfi *MockFileInfo
+	var (
+		mfi *MockFileInfo
+		err error
+	)
 	if mfi, err = mf.stat(); err != nil {
-		return 0, err
+		return err
 	}
-	return mfi.data.Truncate(size)
+	mfi.data.Truncate(int(size))
+	return nil
 }
 
 func (mf *MockFile) Write(b []byte) (n int, err error) {
@@ -329,7 +333,7 @@ func (mf *MockFile) WriteString(s string) (ret int, err error) {
 	if mfi, err = mf.stat(); err != nil {
 		return 0, err
 	}
-	return mfi.data.Write(s)
+	return mfi.data.WriteString(s)
 }
 
 type MockFileInfo struct {
