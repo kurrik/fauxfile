@@ -15,7 +15,6 @@
 package fauxfile
 
 import (
-	"bytes"
 	"errors"
 	"io"
 	"os"
@@ -23,6 +22,12 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+)
+
+var (
+	ErrFileClosed = errors.New("File is closed")
+	ErrOutOfRange = errors.New("Out of range")
+	ErrTooLarge   = errors.New("Too large")
 )
 
 func GetPathError(path string, message string) error {
@@ -43,7 +48,7 @@ func NewMockFilesystem() *MockFilesystem {
 		filesystem: nil,
 		mode:       os.ModeDir | 0755,
 		modified:   time.Now(),
-		data:       nil,
+		buf:        []byte{},
 		parent:     nil,
 		children:   map[string]*MockFileInfo{},
 	}
@@ -112,7 +117,7 @@ func (mf *MockFilesystem) Mkdir(name string, perm os.FileMode) error {
 		filesystem: mf,
 		mode:       perm | os.ModeDir,
 		modified:   time.Now(),
-		data:       new(bytes.Buffer),
+		buf:        []byte{},
 		parent:     fi,
 		children:   map[string]*MockFileInfo{},
 	}
@@ -175,28 +180,30 @@ func (mf *MockFilesystem) Create(name string) (file File, err error) {
 		filesystem: mf,
 		mode:       0666,
 		modified:   time.Now(),
-		data:       new(bytes.Buffer),
+		buf:        []byte{},
 		parent:     fi,
 		children:   nil,
 	}
 	fi.modified = time.Now()
 	f := &MockFile{
 		filesystem: mf,
-		closed:     false,
+		fi:         fi,
 		path:       path,
+		off: 0,
 	}
 	return f, nil
 }
 
 func (mf *MockFilesystem) Open(name string) (file File, err error) {
-	_, err = mf.resolve(name)
+	fi, err := mf.resolve(name)
 	if err != nil {
 		return nil, err
 	}
 	f := &MockFile{
 		filesystem: mf,
-		closed:     false,
+		fi:         fi,
 		path:       name,
+		off: 0,
 	}
 	return f, nil
 }
@@ -207,11 +214,33 @@ func (mf *MockFilesystem) OpenFile(name string, flag int, perm os.FileMode) (fil
 
 type MockFile struct {
 	path       string
-	closed     bool
+	fi         *MockFileInfo
 	filesystem *MockFilesystem
+	off        int64
+}
+
+func (mf *MockFile) grow(n int) (err error) {
+	if mf.fi == nil {
+		return ErrFileClosed
+	}
+	if len(mf.fi.buf) + n > cap(mf.fi.buf) {
+		var buf []byte
+		defer func() {
+			if recover() != nil {
+				err = ErrTooLarge
+			}
+		}()
+		buf = make([]byte, 2 * cap(mf.fi.buf) + n)
+		copy(buf, mf.fi.buf)
+		mf.fi.buf = buf
+	}
+	return
 }
 
 func (mf *MockFile) stat() (mfi *MockFileInfo, err error) {
+	if mf.fi != nil {
+		return mf.fi, nil
+	}
 	return mf.filesystem.resolve(mf.path)
 }
 
@@ -232,7 +261,8 @@ func (mf *MockFile) Chmod(mode os.FileMode) error {
 }
 
 func (mf *MockFile) Close() error {
-	mf.closed = true
+	mf.fi = nil
+	mf.off = 0
 	return nil
 }
 
@@ -246,11 +276,20 @@ func (mf *MockFile) Read(b []byte) (n int, err error) {
 	if mfi, err = mf.stat(); err != nil {
 		return 0, err
 	}
-	return mfi.data.Read(b)
+	if mf.off >= int64(len(mfi.buf)) {
+		if len(b) == 0 {
+			return
+		}
+		return 0, io.EOF
+	}
+	n = copy(b, mfi.buf[mf.off:])
+	mf.off += int64(n)
+	return
 }
 
 func (mf *MockFile) ReadAt(b []byte, off int64) (n int, err error) {
-	return 0, errors.New("Not implemented")
+	mf.off = off
+	return mf.Read(b)
 }
 
 func (mf *MockFile) Readdir(n int) (fi []os.FileInfo, err error) {
@@ -293,7 +332,18 @@ func (mf *MockFile) Readdirnames(n int) (names []string, err error) {
 }
 
 func (mf *MockFile) Seek(offset int64, whence int) (ret int64, err error) {
-	return 0, errors.New("Not implemented")
+	if mf.fi == nil {
+		return mf.off, ErrFileClosed
+	}
+	switch whence {
+	case 0:
+		mf.off = offset
+	case 1:
+		mf.off += offset
+	case 2:
+		mf.off = int64(len(mf.fi.buf)) + offset
+	}
+	return mf.off, nil
 }
 
 func (mf *MockFile) Stat() (fi os.FileInfo, err error) {
@@ -305,39 +355,37 @@ func (mf *MockFile) Sync() (err error) {
 }
 
 func (mf *MockFile) Truncate(size int64) error {
-	var (
-		mfi *MockFileInfo
-		err error
-	)
-	if mfi, err = mf.stat(); err != nil {
-		return err
+	if mf.fi == nil {
+		return ErrFileClosed
 	}
-	mfi.data.Truncate(int(size))
+	if size < 0 || size > int64(len(mf.fi.buf)) {
+		return ErrOutOfRange
+	}
+	mf.fi.buf = mf.fi.buf[0 : size]
 	return nil
 }
 
 func (mf *MockFile) Write(b []byte) (n int, err error) {
-	var mfi *MockFileInfo
-	if mfi, err = mf.stat(); err != nil {
-		return 0, err
+	if mf.fi == nil {
+		return 0, ErrFileClosed
 	}
-	return mfi.data.Write(b)
+	if err = mf.grow(len(b)); err != nil {
+		return
+	}
+	return copy(mf.fi.buf[mf.off:], b), nil
 }
 
 func (mf *MockFile) WriteAt(b []byte, off int64) (n int, err error) {
-	return 0, errors.New("Not implemented")
+	mf.off = off
+	return mf.Write(b)
 }
 
 func (mf *MockFile) WriteString(s string) (ret int, err error) {
-	var mfi *MockFileInfo
-	if mfi, err = mf.stat(); err != nil {
-		return 0, err
-	}
-	return mfi.data.WriteString(s)
+	return mf.Write([]byte(s))
 }
 
 type MockFileInfo struct {
-	data       *bytes.Buffer
+	buf        []byte
 	name       string
 	filesystem *MockFilesystem
 	mode       os.FileMode
@@ -373,7 +421,7 @@ func (mfi *MockFileInfo) Name() string {
 }
 
 func (mfi *MockFileInfo) Size() int64 {
-	return int64(mfi.data.Len())
+	return int64(len(mfi.buf))
 }
 
 func (mfi *MockFileInfo) Mode() os.FileMode {
