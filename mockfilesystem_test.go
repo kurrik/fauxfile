@@ -16,12 +16,13 @@ package fauxfile
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"testing"
 )
 
 func ExpectCwd(t *testing.T, expected string, mf *MockFilesystem) {
-	if mf.cwd.file.path != expected {
+	if mf.cwd.path() != expected {
 		t.Fatalf("Expected cwd of '%v', got '%v'", expected, mf.cwd)
 	}
 }
@@ -98,8 +99,8 @@ func TestCreateSubdirectoryPath(t *testing.T) {
 		t.Fatalf("Create should not throw error")
 	}
 	fi := ExpectFile(t, "/foo/foo.txt", mf)
-	ExpectEqual(t, "/foo/foo.txt", fi.file.path)
-	ExpectEqual(t, "foo.txt", fi.file.name)
+	ExpectEqual(t, "/foo/foo.txt", fi.path())
+	ExpectEqual(t, "foo.txt", fi.name)
 }
 
 func TestLongFormCreate(t *testing.T) {
@@ -110,8 +111,8 @@ func TestLongFormCreate(t *testing.T) {
 		t.Fatalf("Create should not throw error")
 	}
 	fi := ExpectFile(t, "/foo/foo.txt", mf)
-	ExpectEqual(t, "/foo/foo.txt", fi.file.path)
-	ExpectEqual(t, "foo.txt", fi.file.name)
+	ExpectEqual(t, "/foo/foo.txt", fi.path())
+	ExpectEqual(t, "foo.txt", fi.name)
 }
 
 func TestOpen(t *testing.T) {
@@ -121,8 +122,8 @@ func TestOpen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error: %v", err)
 	}
-	ExpectEqual(t, "foo.txt", f.(*MockFile).name)
-	ExpectEqual(t, "/foo.txt", f.(*MockFile).path)
+	ExpectEqual(t, "foo.txt", f.(*MockFile).Name())
+	ExpectEqual(t, "foo.txt", f.(*MockFile).path)
 }
 
 func TestRemove(t *testing.T) {
@@ -184,7 +185,7 @@ func TestReaddir(t *testing.T) {
 	}
 	files := map[string]string{}
 	for _, i := range fi {
-		files[i.Name()] = i.(*MockFileInfo).file.path
+		files[i.Name()] = i.(*MockFileInfo).path()
 	}
 	ExpectEqual(t, "/foo/a", files["a"])
 	ExpectEqual(t, "/foo/b.txt", files["b.txt"])
@@ -217,4 +218,59 @@ func TestFileChdir(t *testing.T) {
 	ExpectCwd(t, "/", mf)
 	f.Chdir()
 	ExpectCwd(t, "/foo/bar/baz", mf)
+}
+
+func TestFileChmod(t *testing.T) {
+	var (
+		f   File
+		fi  os.FileInfo
+		err error
+	)
+	mf := NewMockFilesystem()
+	mf.Create("foo.txt")
+	if f, err = mf.Open("foo.txt"); err != nil {
+		t.Fatalf("File expected: %v", err)
+	}
+	fi = ExpectFile(t, "foo.txt", mf)
+	if perm := fi.Mode().Perm(); perm != 0666 {
+		t.Fatalf("New file perm %v, expected 0666", perm)
+	}
+	if err = f.Chmod(0755); err != nil {
+		t.Fatalf("Chmod should not return error: %v", err)
+	}
+	if perm := fi.Mode().Perm(); perm != 0755 {
+		t.Fatalf("Perm %v, expected 0755", perm)
+	}
+}
+
+func TestStat(t *testing.T) {
+	var (
+		mf  *MockFilesystem
+		f   File
+		fi  os.FileInfo
+		err error
+	)
+	mf = NewMockFilesystem()
+	mf.Mkdir("foo", 0755)
+	mf.Create("/foo/foo.txt")
+	if f, err = mf.Open("/foo/foo.txt"); err != nil {
+		t.Fatalf("File should exist: %v", err)
+	}
+	if fi, err = f.Stat(); err != nil {
+		t.Fatalf("Stat should not throw error: %v", err)
+	}
+	if fi.Name() != "foo.txt" {
+		t.Fatalf("Stat should return accurate file object.")
+	}
+}
+
+func TestFileInfoPath(t *testing.T) {
+	mf := NewMockFilesystem()
+	mf.MkdirAll("/foo/bar/baz", 0755)
+	fp := "/foo/bar/baz/foo.txt"
+	mf.Create(fp)
+	fi := ExpectFile(t, fp, mf)
+	if fi.path() != fp {
+		t.Fatalf("Expected path of %v, got %v", fp, fi.path())
+	}
 }

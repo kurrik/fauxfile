@@ -18,9 +18,16 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
+)
+
+var (
+	ErrFileClosed = errors.New("File is closed")
+	ErrOutOfRange = errors.New("Out of range")
+	ErrTooLarge   = errors.New("Too large")
 )
 
 func GetPathError(path string, message string) error {
@@ -37,22 +44,19 @@ type MockFilesystem struct {
 
 func NewMockFilesystem() *MockFilesystem {
 	root := &MockFileInfo{
-		file: &MockFile{
-			name:       "/",
-			path:       "/",
-			filesystem: nil,
-			mode:       os.ModeDir | 0755,
-			modified:   time.Now(),
-			data:       nil,
-			parent:     nil,
-			children:   map[string]*MockFileInfo{},
-		},
+		name:       "/",
+		filesystem: nil,
+		mode:       os.ModeDir | 0755,
+		modified:   time.Now(),
+		buf:        []byte{},
+		parent:     nil,
+		children:   map[string]*MockFileInfo{},
 	}
 	mf := &MockFilesystem{
 		cwd:  root,
 		root: root,
 	}
-	root.file.filesystem = mf
+	root.filesystem = mf
 	return mf
 }
 
@@ -60,7 +64,7 @@ func (mf *MockFilesystem) getpath(path string) string {
 	if filepath.IsAbs(path) {
 		return filepath.Clean(path)
 	}
-	return filepath.Join(mf.cwd.file.path, path)
+	return filepath.Join(mf.cwd.path(), path)
 }
 
 func (mf *MockFilesystem) resolve(path string) (*MockFileInfo, error) {
@@ -108,19 +112,16 @@ func (mf *MockFilesystem) Mkdir(name string, perm os.FileMode) error {
 	if child := fi.Child(dirname); child != nil {
 		return GetPathError(path, "Path already exists")
 	}
-	fi.file.children[dirname] = &MockFileInfo{
-		file: &MockFile{
-			name:       dirname,
-			path:       path,
-			filesystem: mf,
-			mode:       perm | os.ModeDir,
-			modified:   time.Now(),
-			data:       nil,
-			parent:     fi,
-			children:   map[string]*MockFileInfo{},
-		},
+	fi.children[dirname] = &MockFileInfo{
+		name:       dirname,
+		filesystem: mf,
+		mode:       perm | os.ModeDir,
+		modified:   time.Now(),
+		buf:        []byte{},
+		parent:     fi,
+		children:   map[string]*MockFileInfo{},
 	}
-	fi.file.modified = time.Now()
+	fi.modified = time.Now() // Update directory's timestamp.
 	return nil
 }
 
@@ -148,8 +149,8 @@ func (mf *MockFilesystem) Remove(name string) error {
 	if len(fi.Children()) > 0 {
 		return GetPathError(name, "Directory contains children")
 	}
-	delete(fi.Parent().Children(), fi.file.name)
-	fi.Parent().file.modified = time.Now()
+	delete(fi.Parent().Children(), fi.name)
+	fi.Parent().modified = time.Now()
 	return nil
 }
 
@@ -158,8 +159,8 @@ func (mf *MockFilesystem) RemoveAll(path string) error {
 	if err != nil {
 		return err
 	}
-	delete(fi.Parent().Children(), fi.file.name)
-	fi.Parent().file.modified = time.Now()
+	delete(fi.Parent().Children(), fi.name)
+	fi.Parent().modified = time.Now()
 	return nil
 }
 
@@ -174,20 +175,23 @@ func (mf *MockFilesystem) Create(name string) (file File, err error) {
 	if err != nil {
 		return nil, err
 	}
-	fi.file.children[filename] = &MockFileInfo{
-		file: &MockFile{
-			name:       filename,
-			path:       path,
-			filesystem: mf,
-			mode:       0666,
-			modified:   time.Now(),
-			data:       nil,
-			parent:     fi,
-			children:   nil,
-		},
+	fi.children[filename] = &MockFileInfo{
+		name:       filename,
+		filesystem: mf,
+		mode:       0666,
+		modified:   time.Now(),
+		buf:        []byte{},
+		parent:     fi,
+		children:   nil,
 	}
-	fi.file.modified = time.Now()
-	return fi.Child(filename).file, nil
+	fi.modified = time.Now()
+	f := &MockFile{
+		filesystem: mf,
+		fi:         fi,
+		path:       path,
+		off: 0,
+	}
+	return f, nil
 }
 
 func (mf *MockFilesystem) Open(name string) (file File, err error) {
@@ -195,7 +199,13 @@ func (mf *MockFilesystem) Open(name string) (file File, err error) {
 	if err != nil {
 		return nil, err
 	}
-	return fi.file, nil
+	f := &MockFile{
+		filesystem: mf,
+		fi:         fi,
+		path:       name,
+		off: 0,
+	}
+	return f, nil
 }
 
 func (mf *MockFilesystem) OpenFile(name string, flag int, perm os.FileMode) (file File, err error) {
@@ -203,56 +213,106 @@ func (mf *MockFilesystem) OpenFile(name string, flag int, perm os.FileMode) (fil
 }
 
 type MockFile struct {
-	name       string
 	path       string
+	fi         *MockFileInfo
 	filesystem *MockFilesystem
-	mode       os.FileMode
-	modified   time.Time
-	data       *[]byte
-	parent     *MockFileInfo
-	children   map[string]*MockFileInfo
+	off        int64
 }
 
+func (mf *MockFile) grow(n int) (err error) {
+	if mf.fi == nil {
+		return ErrFileClosed
+	}
+	if len(mf.fi.buf) + n > cap(mf.fi.buf) {
+		var buf []byte
+		defer func() {
+			if recover() != nil {
+				err = ErrTooLarge
+			}
+		}()
+		buf = make([]byte, 2 * cap(mf.fi.buf) + n)
+		copy(buf, mf.fi.buf)
+		mf.fi.buf = buf
+	}
+	return
+}
+
+func (mf *MockFile) stat() (mfi *MockFileInfo, err error) {
+	if mf.fi != nil {
+		return mf.fi, nil
+	}
+	return mf.filesystem.resolve(mf.path)
+}
 
 func (mf *MockFile) Chdir() error {
 	return mf.filesystem.Chdir(filepath.Dir(mf.path))
 }
 
 func (mf *MockFile) Chmod(mode os.FileMode) error {
-	return errors.New("Not implemented")
+	var (
+		mfi *MockFileInfo
+		err error
+	)
+	if mfi, err = mf.stat(); err != nil {
+		return err
+	}
+	mfi.mode = mode
+	return nil
 }
 
 func (mf *MockFile) Close() error {
-	return errors.New("Not implemented")
+	mf.fi = nil
+	mf.off = 0
+	return nil
 }
 
 func (mf *MockFile) Name() string {
-	return mf.name
+	_, filename := filepath.Split(mf.path)
+	return filename
 }
 
 func (mf *MockFile) Read(b []byte) (n int, err error) {
-	return 0, errors.New("Not implemented")
+	var mfi *MockFileInfo
+	if mfi, err = mf.stat(); err != nil {
+		return 0, err
+	}
+	if mf.off >= int64(len(mfi.buf)) {
+		if len(b) == 0 {
+			return
+		}
+		return 0, io.EOF
+	}
+	n = copy(b, mfi.buf[mf.off:])
+	mf.off += int64(n)
+	return
 }
 
 func (mf *MockFile) ReadAt(b []byte, off int64) (n int, err error) {
-	return 0, errors.New("Not implemented")
+	mf.off = off
+	return mf.Read(b)
 }
 
 func (mf *MockFile) Readdir(n int) (fi []os.FileInfo, err error) {
 	// TODO: Enable returning additional elements in subsequent calls.
+	var (
+		mfi *MockFileInfo
+	)
 	fi = make([]os.FileInfo, 0)
-	limit := len(mf.children)
+	if mfi, err = mf.stat(); err != nil {
+		return nil, err
+	}
+	limit := len(mfi.children)
 	if n > 0 {
 		limit = n
 	}
-	if len(mf.children) < limit {
+	if len(mfi.children) < limit {
 		err = io.EOF
 	}
-	if len(mf.children) == 0 {
+	if len(mfi.children) == 0 {
 		return
 	}
 	i := 0
-	for _, child := range mf.children {
+	for _, child := range mfi.children {
 		if i == limit {
 			break
 		}
@@ -272,67 +332,108 @@ func (mf *MockFile) Readdirnames(n int) (names []string, err error) {
 }
 
 func (mf *MockFile) Seek(offset int64, whence int) (ret int64, err error) {
-	return 0, errors.New("Not implemented")
+	if mf.fi == nil {
+		return mf.off, ErrFileClosed
+	}
+	switch whence {
+	case 0:
+		mf.off = offset
+	case 1:
+		mf.off += offset
+	case 2:
+		mf.off = int64(len(mf.fi.buf)) + offset
+	}
+	return mf.off, nil
 }
 
 func (mf *MockFile) Stat() (fi os.FileInfo, err error) {
-	return nil, errors.New("Not implemented")
+	return mf.stat()
 }
 
 func (mf *MockFile) Sync() (err error) {
-	return errors.New("Not implemented")
+	return nil
 }
 
 func (mf *MockFile) Truncate(size int64) error {
-	return errors.New("Not implemented")
+	if mf.fi == nil {
+		return ErrFileClosed
+	}
+	if size < 0 || size > int64(len(mf.fi.buf)) {
+		return ErrOutOfRange
+	}
+	mf.fi.buf = mf.fi.buf[0 : size]
+	return nil
 }
 
 func (mf *MockFile) Write(b []byte) (n int, err error) {
-	return 0, errors.New("Not implemented")
+	if mf.fi == nil {
+		return 0, ErrFileClosed
+	}
+	if err = mf.grow(len(b)); err != nil {
+		return
+	}
+	return copy(mf.fi.buf[mf.off:], b), nil
 }
 
 func (mf *MockFile) WriteAt(b []byte, off int64) (n int, err error) {
-	return 0, errors.New("Not implemented")
+	mf.off = off
+	return mf.Write(b)
 }
 
 func (mf *MockFile) WriteString(s string) (ret int, err error) {
-	return 0, errors.New("Not implemented")
+	return mf.Write([]byte(s))
 }
 
 type MockFileInfo struct {
-	file *MockFile
+	buf        []byte
+	name       string
+	filesystem *MockFilesystem
+	mode       os.FileMode
+	modified   time.Time
+	parent     *MockFileInfo
+	children   map[string]*MockFileInfo
+}
+
+func (mfi *MockFileInfo) path() string {
+	ptr := mfi
+	filepath := mfi.name
+	for ptr != mfi.filesystem.root {
+		ptr = ptr.parent
+		filepath = path.Join(ptr.name, filepath)
+	}
+	return filepath
 }
 
 func (mfi *MockFileInfo) Parent() *MockFileInfo {
-	return mfi.file.parent
+	return mfi.parent
 }
 
 func (mfi *MockFileInfo) Children() map[string]*MockFileInfo {
-	return mfi.file.children
+	return mfi.children
 }
 
 func (mfi *MockFileInfo) Child(name string) *MockFileInfo {
-	return mfi.file.children[name]
+	return mfi.children[name]
 }
 
 func (mfi *MockFileInfo) Name() string {
-	return mfi.file.name
+	return mfi.name
 }
 
 func (mfi *MockFileInfo) Size() int64 {
-	return int64(len(*mfi.file.data))
+	return int64(len(mfi.buf))
 }
 
 func (mfi *MockFileInfo) Mode() os.FileMode {
-	return mfi.file.mode
+	return mfi.mode
 }
 
 func (mfi *MockFileInfo) ModTime() time.Time {
-	return mfi.file.modified
+	return mfi.modified
 }
 
 func (mfi *MockFileInfo) IsDir() bool {
-	return mfi.file.mode.IsDir()
+	return mfi.mode.IsDir()
 }
 
 func (mfi *MockFileInfo) Sys() interface{} {
