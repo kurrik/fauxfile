@@ -7,5 +7,13 @@ a filesystem interface, so that unit testing file functionality is simplified.
 
 Current Status
 --------------
-Starting to get to a place where it could be used, major filesystem operations
-exist, need to work on File I/O.
+Most methods implemented although tests are spotty.  Starting to use this in
+https://github.com/kurrik/go-fauxfile
+
+Using
+-----
+Run
+  go get github.com/kurrik/go-fauxfile
+
+Then include the following in your source:
+  include "github.com/kurrik/go-fauxfile"
