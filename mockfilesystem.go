@@ -187,7 +187,7 @@ func (mf *MockFilesystem) Create(name string) (file File, err error) {
 	fi.modified = time.Now()
 	f := &MockFile{
 		filesystem: mf,
-		fi:         fi,
+		fi:         fi.children[filename],
 		path:       path,
 		off: 0,
 	}

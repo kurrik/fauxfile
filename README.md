@@ -8,7 +8,7 @@ a filesystem interface, so that unit testing file functionality is simplified.
 Current Status
 --------------
 Most methods implemented although tests are spotty.  Starting to use this in
-https://github.com/kurrik/go-fauxfile
+https://github.com/kurrik/ghostwriter
 
 Using
 -----

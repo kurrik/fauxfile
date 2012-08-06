@@ -274,3 +274,35 @@ func TestFileInfoPath(t *testing.T) {
 		t.Fatalf("Expected path of %v, got %v", fp, fi.path())
 	}
 }
+
+func TestWrite(t *testing.T) {
+	var (
+		fs     Filesystem
+		f      File
+		err    error
+		info   os.FileInfo
+		input  string
+		output []byte
+	)
+	fs = NewMockFilesystem()
+	f, _ = fs.Create("foo.txt")
+	input = "Hello world"
+	f.Write([]byte(input))
+	f.Close()
+	if f, err = fs.Open("foo.txt"); err != nil {
+		t.Fatalf("Could not open written file: %v", err)
+	}
+	if info, err = f.Stat(); err != nil {
+		t.Fatalf("Stat should not raise error: %v", err)
+	}
+	if info.Size() != int64(len(input)) {
+		t.Fatalf("File size %v, expected %v", info.Size(), len(input))
+	}
+	output = make([]byte, info.Size())
+	if _, err = f.Read(output); err != nil {
+		t.Fatalf("Read should not return error: %v", err)
+	}
+	if string(output) != input {
+		t.Fatalf("Read: %v != expected: %v", string(output), input)
+	}
+}
