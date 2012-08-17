@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"fmt"
 )
 
 var (
@@ -189,7 +190,7 @@ func (mf *MockFilesystem) Create(name string) (file File, err error) {
 		filesystem: mf,
 		fi:         fi.children[filename],
 		path:       path,
-		off: 0,
+		off:        0,
 	}
 	return f, nil
 }
@@ -203,13 +204,51 @@ func (mf *MockFilesystem) Open(name string) (file File, err error) {
 		filesystem: mf,
 		fi:         fi,
 		path:       name,
-		off: 0,
+		off:        0,
 	}
 	return f, nil
 }
 
 func (mf *MockFilesystem) OpenFile(name string, flag int, perm os.FileMode) (file File, err error) {
 	return nil, errors.New("Not implemented")
+}
+
+// Prints the filesystem to stdout, useful for testing.
+// Not part of the filesystem interface.
+func (mf *MockFilesystem) Print() {
+	var (
+		dirs   []string
+		lines  [][]interface{}
+		path   string
+		f      File
+		fi     os.FileInfo
+		files  []os.FileInfo
+		maxlen int
+	)
+	dirs   = append(dirs, "/")
+	maxlen = 1
+	for len(dirs) > 0 {
+		path = dirs[0]
+		dirs = dirs[1:]
+		f, _ = mf.Open(path)
+		fi, _ = f.Stat()
+		files, _ = f.Readdir(100)
+		for _, fi = range files {
+			name := filepath.Join(path, fi.Name())
+			line := []interface{}{name, fi.Mode(), fi.IsDir()}
+			lines = append(lines, line)
+			if len(name) > maxlen {
+				maxlen = len(name)
+			}
+			if fi.IsDir() {
+				dirs = append(dirs, name)
+			}
+		}
+	}
+	fmtstr := fmt.Sprintf("%%-%vv %%v %%v\n", maxlen)
+	for _, line := range lines {
+		fmt.Printf(fmtstr, line[0], line[1], line[2])
+	}
 }
 
 type MockFile struct {
@@ -223,14 +262,14 @@ func (mf *MockFile) grow(n int) (err error) {
 	if mf.fi == nil {
 		return ErrFileClosed
 	}
-	if len(mf.fi.buf) + n > cap(mf.fi.buf) {
+	if len(mf.fi.buf)+n > cap(mf.fi.buf) {
 		var buf []byte
 		defer func() {
 			if recover() != nil {
 				err = ErrTooLarge
 			}
 		}()
-		buf = make([]byte, 2 * cap(mf.fi.buf) + n)
+		buf = make([]byte, 2*cap(mf.fi.buf)+n)
 		copy(buf, mf.fi.buf)
 		mf.fi.buf = buf
 	}
@@ -361,7 +400,7 @@ func (mf *MockFile) Truncate(size int64) error {
 	if size < 0 || size > int64(len(mf.fi.buf)) {
 		return ErrOutOfRange
 	}
-	mf.fi.buf = mf.fi.buf[0 : size]
+	mf.fi.buf = mf.fi.buf[0:size]
 	return nil
 }
 
