@@ -13,7 +13,7 @@ https://github.com/kurrik/ghostwriter
 Using
 -----
 Run
-  go get github.com/kurrik/go-fauxfile
+  go get github.com/kurrik/fauxfile
 
 Then include the following in your source:
-  include "github.com/kurrik/go-fauxfile"
+  include "github.com/kurrik/fauxfile"
