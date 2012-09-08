@@ -111,7 +111,7 @@ func (mf *MockFilesystem) Mkdir(name string, perm os.FileMode) error {
 		return err
 	}
 	if child := fi.Child(dirname); child != nil {
-		return GetPathError(path, "Path already exists")
+		return nil // Path already exists
 	}
 	fi.children[dirname] = &MockFileInfo{
 		name:       dirname,

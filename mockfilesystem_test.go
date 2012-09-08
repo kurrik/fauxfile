@@ -81,6 +81,15 @@ func TestMkdirAll(t *testing.T) {
 	ExpectDir(t, "/foo/bar/baz", mf)
 }
 
+func TestMkdirAllWithChdir(t *testing.T) {
+	mf := NewMockFilesystem()
+	mf.MkdirAll("/home/test", 0755)
+	mf.Chdir("/home/test")
+	mf.Mkdir("src", 0755)
+	mf.MkdirAll("/home/test/src/static", 0755)
+	ExpectDir(t, "/home/test/src/static", mf)
+}
+
 func TestCreate(t *testing.T) {
 	mf := NewMockFilesystem()
 	mf.Create("foo.txt")
