@@ -43,6 +43,7 @@ type Filesystem interface {
 	Create(name string) (file File, err error)
 	Open(name string) (file File, err error)
 	OpenFile(name string, flag int, perm os.FileMode) (file File, err error)
+	Stat(name string) (fi os.FileInfo, err error)
 }
 
 type RealFilesystem struct {}
@@ -81,4 +82,8 @@ func (f *RealFilesystem) Open(name string) (file File, err error) {
 
 func (f *RealFilesystem) OpenFile(name string, flag int, perm os.FileMode) (file File, err error) {
 	return os.OpenFile(name, flag, perm)
+}
+
+func (f *RealFilesystem) Stat(name string) (fi os.FileInfo, err error) {
+	return os.Stat(name)
 }

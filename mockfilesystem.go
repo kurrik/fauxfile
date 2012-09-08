@@ -213,6 +213,14 @@ func (mf *MockFilesystem) OpenFile(name string, flag int, perm os.FileMode) (fil
 	return nil, errors.New("Not implemented")
 }
 
+func (mf *MockFilesystem) Stat(name string) (fi os.FileInfo, err error) {
+	f, err := mf.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	return f.Stat()
+}
+
 // Prints the filesystem to stdout, useful for testing.
 // Not part of the filesystem interface.
 func (mf *MockFilesystem) Print() {
