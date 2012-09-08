@@ -16,13 +16,13 @@ package fauxfile
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 	"time"
-	"fmt"
 )
 
 var (
@@ -233,7 +233,7 @@ func (mf *MockFilesystem) Print() {
 		files  []os.FileInfo
 		maxlen int
 	)
-	dirs   = append(dirs, "/")
+	dirs = append(dirs, "/")
 	maxlen = 1
 	for len(dirs) > 0 {
 		path = dirs[0]

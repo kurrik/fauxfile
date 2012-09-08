@@ -46,7 +46,7 @@ type Filesystem interface {
 	Stat(name string) (fi os.FileInfo, err error)
 }
 
-type RealFilesystem struct {}
+type RealFilesystem struct{}
 
 func (f *RealFilesystem) Chdir(dir string) error {
 	return os.Chdir(dir)
